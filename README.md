@@ -1,9 +1,27 @@
-# Build Number Action
+# Build Number (Abacus) — GitHub Action
 
-Generate **monotonic build numbers** in GitHub Actions with **separate counters per project** (or any key).  
-Implementation note: this action is a thin wrapper around the Abacus counting API.
+Generate **monotonic build numbers** in GitHub Actions with **separate counters per project** (or any other key).
+This action is a thin wrapper around the **Abacus** counting API.
 
-Abacus API docs: https://abacus.jasoncameron.dev/
+Abacus API docs: https://abacus.jasoncameron.dev/  
+Abacus server source: https://github.com/JasonLovesDoggo/abacus
+
+## What this solves
+
+- You need a build number that is **always +1** versus the previous run.
+- One CI workflow builds **multiple projects**, so you need **independent counters** per project.
+- You want to **start from an existing number** (via `create` initializer, or later via admin ops).
+
+## Supported operations
+
+- `hit` — increment by 1 and return the new value (creates the counter if missing)
+- `get` — return the current value
+- `info` — return metadata (exists, TTL, etc.)
+- `create` — create a counter and return `admin_key` (only returned once)
+- `set` — set an exact value (**admin**)
+- `update` — add a delta (can be negative) (**admin**)
+- `reset` — set value to `0` (**admin**)
+- `delete` — delete the counter (**admin**)
 
 ## Quick start
 
@@ -16,28 +34,13 @@ jobs:
         id: buildno
         uses: Appegy/Abacus@v1
         with:
-          # defaults to hit, shown explicitly for clarity
           operation: hit
-          namespace: ci-mycompany
+          namespace: my-org
           key: build-api
 
-      - run: echo "BUILD_NUMBER=${{ steps.buildno.outputs.value }}"
+      - name: Use the build number
+        run: echo "build=${{ steps.buildno.outputs.value }}"
 ```
-
----
-
-## Operations
-
-Supported operations (`operation` input):
-
-- `hit` — increment by 1 and return the new value (creates the counter if missing)
-- `create` — create a counter (optionally starting at `initializer`) and return `admin_key`
-- `get` — read current value (no increment)
-- `info` — read value plus metadata (exists/TTL/etc.)
-- `set` — set the counter to an exact value (admin key required)
-- `update` — add a delta (negative allowed; admin key required)
-- `reset` — reset the counter to 0 (admin key required)
-- `delete` — delete the counter (admin key required)
 
 ---
 
@@ -61,7 +64,7 @@ Supported operations (`operation` input):
 | `value` | `hit`, `create`, `get`, `set`, `reset`, `update` | integer (string in Actions) | The counter value returned by Abacus. |
 | `namespace` | `create` | string | Echoed namespace. |
 | `key` | `create` | string | Echoed key. |
-| `admin_key` | `create` | string | Only returned by Abacus on create. Store it in GitHub Secrets. |
+| `admin_key` | `create` | string | **Only returned once** by Abacus on create. Store it immediately. |
 | `exists` | `info` | string | Boolean-ish (`true`/`false`). |
 | `expires_in` | `info` | string | Seconds-ish value from Abacus. |
 | `expires_str` | `info` | string | Human-readable TTL string. |
@@ -79,15 +82,10 @@ Supported operations (`operation` input):
 `admin_key` is returned **only once** by `create`. Save it immediately.  
 If you lose it, **admin operations** (`set`, `update`, `reset`, `delete`) for that counter become permanently unavailable.
 
-The workflow below:
-- creates a counter
-- writes `namespace`, `key`, and `admin_key` to a file
-- uploads the file as an artifact so you can download it from the run page
-
-After you download it, store the `admin_key` in **GitHub Secrets** and delete/expire the artifact (artifacts are not a secure secret store).
+Example workflow that creates a counter and uploads the admin key as an artifact:
 
 ```yaml
-name: abacus-bootstrap-admin-key
+name: bootstrap-abacus-admin-key
 
 on:
   workflow_dispatch:
@@ -95,9 +93,11 @@ on:
       namespace:
         description: "Abacus namespace"
         required: true
+        default: "my-org"
       key:
         description: "Counter key"
         required: true
+        default: "build-api"
       initializer:
         description: "Starting value"
         required: false
@@ -107,7 +107,7 @@ jobs:
   bootstrap:
     runs-on: ubuntu-latest
     steps:
-      - name: Create counter (returns admin_key once)
+      - name: Create counter (admin_key is returned once)
         id: create
         uses: Appegy/Abacus@v1
         with:
@@ -127,7 +127,7 @@ jobs:
           admin_key=${{ steps.create.outputs.admin_key }}
           EOF
 
-      - name: Upload artifact (download from the run page)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: abacus-admin-key-${{ inputs.namespace }}-${{ inputs.key }}
@@ -136,14 +136,14 @@ jobs:
           retention-days: 1
 ```
 
-### 2) Use all operations (except `create`) in one workflow
+After you retrieve the value, store it as a repository secret (for example `ABACUS_ADMIN_KEY`) and delete the artifact.
 
-This workflow demonstrates:
-- non-admin ops: `hit`, `get`, `info`
-- admin ops: `set`, `update`, `reset`, `delete`
+### 2) Use the operations (excluding `create`)
 
 Prerequisite:
 - add a repository secret named `ABACUS_ADMIN_KEY` that matches this `(namespace, key)` counter.
+
+This workflow demonstrates all operations except `create`:
 
 ```yaml
 name: abacus-operations-demo
@@ -154,9 +154,11 @@ on:
       namespace:
         description: "Abacus namespace"
         required: true
+        default: "my-org"
       key:
         description: "Counter key"
         required: true
+        default: "build-api"
       do_delete:
         description: "Also delete the counter at the end"
         required: false
@@ -182,7 +184,7 @@ jobs:
           namespace: ${{ inputs.namespace }}
           key: ${{ inputs.key }}
 
-      - name: Read metadata (exists/TTL/etc.)
+      - name: Get metadata
         id: info
         uses: Appegy/Abacus@v1
         with:
@@ -200,7 +202,7 @@ jobs:
           value: 1000
           admin_key: ${{ secrets.ABACUS_ADMIN_KEY }}
 
-      - name: Apply delta (admin)
+      - name: Update by delta (admin)
         id: update
         uses: Appegy/Abacus@v1
         with:
@@ -221,7 +223,6 @@ jobs:
 
       - name: Delete counter (admin)
         if: ${{ inputs.do_delete == 'true' }}
-        id: delete
         uses: Appegy/Abacus@v1
         with:
           operation: delete
@@ -237,3 +238,8 @@ jobs:
 - `hit` consumes a number immediately. If your job fails later, that number is still consumed.
 - For multi-project CI, use different `key` values (e.g. `build-api`, `build-web`) to keep counters independent.
 - If you delete a counter, you must `create` it again, and the new counter will have a **new** `admin_key`.
+
+## Attribution
+
+- Publisher/maintainer: Appegy (Ivan Murashka).
+- Backend: Abacus counting API by Jason Cameron (see server source link above).

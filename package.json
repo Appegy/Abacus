@@ -1,24 +1,12 @@
 {
   "name": "abacus",
   "version": "1.0.0",
-  "description": "GitHub Action for working with Abacus numeric counters (\"Integer as a Service\"). Counters are \"unlisted\" (accessible by key, not listed anywhere).",
-  "main": "index.js",
+  "private": true,
+  "type": "commonjs",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "npm run typecheck && ncc build src/main.ts -o dist --license licenses.txt"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Appegy/Abacus.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Appegy/Abacus/issues"
-  },
-  "homepage": "https://github.com/Appegy/Abacus#readme",
   "dependencies": {
     "@actions/core": "^2.0.1"
   },
