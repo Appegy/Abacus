@@ -1,0 +1,72 @@
+name: Build Number Action (Abacus)
+description: Generate monotonic build numbers (and manage counters) via Abacus.
+author: Appegy
+
+branding:
+  icon: hash
+  color: blue
+
+inputs:
+  operation:
+    description: Operation to perform (hit, create, get, info, set, update, reset, delete).
+    required: false
+    default: hit
+
+  namespace:
+    description: Counter namespace.
+    required: true
+
+  key:
+    description: Counter key.
+    required: true
+
+  initializer:
+    description: Starting value for create.
+    required: false
+    default: "0"
+
+  value:
+    description: Value for set (absolute) or update (delta, can be negative).
+    required: false
+
+  admin_key:
+    description: Admin key for set/update/reset/delete.
+    required: false
+
+outputs:
+  value:
+    description: Counter value (hit/create/get/set/reset/update).
+
+  namespace:
+    description: Counter namespace (create).
+
+  key:
+    description: Counter key (create).
+
+  admin_key:
+    description: Admin key returned by create.
+
+  exists:
+    description: Whether counter exists (info).
+
+  expires_in:
+    description: TTL in seconds (info).
+
+  expires_str:
+    description: TTL as a string (info).
+
+  full_key:
+    description: Fully-qualified key (info).
+
+  is_genuine:
+    description: Abacus authenticity flag (info).
+
+  status:
+    description: Status string (delete).
+
+  message:
+    description: Message string (delete).
+
+runs:
+  using: node24
+  main: dist/index.js
