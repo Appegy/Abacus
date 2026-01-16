@@ -14,7 +14,7 @@ on:
         description: "Counter key"
         required: true
         default: "build-api"
-      initializer:
+      value:
         description: "Starting value"
         required: false
         default: "0"
@@ -30,7 +30,7 @@ jobs:
           operation: set
           namespace: ${{ inputs.namespace }}
           key: ${{ inputs.key }}
-          initializer: ${{ inputs.initializer }}
+          value: ${{ inputs.value }}
           admin_key: ${{ inputs.admin_key }}
       
       - name: Get counter
