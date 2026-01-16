@@ -1,4 +1,4 @@
-name: bootstrap-abacus-admin-key
+name: set
 
 on:
   workflow_dispatch:
